@@ -187,8 +187,28 @@
   font-size: 13px;
 }
 
+/* ── App shell (shell-v2) ─────────────────────────────────────────────
+   The Games app owns its whole content rect: a left rail (the saved-games
+   list) and a main pane (the library or one game), composed with the app-kit
+   Split. */
+.games-app {
+  height: 100%;
+  width: 100%;
+}
+.games-sidebar-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.games-browse-btn {
+  width: 100%;
+}
+
 /* ── Library ──────────────────────────────────────────────────────── */
 .games-library {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   overflow-y: auto;
   padding: 20px 24px 28px;
   gap: 14px;
