@@ -8,7 +8,7 @@
 // CORS; we only hand EmulatorJS the bytes, and it extracts/zip-detects (blob:
 // URLs still work inside the sandbox). The opaque origin has no storage of its
 // own, so battery saves and save states round-trip over postMessage and
-// persist in the extension store.
+// persist in the application store.
 
 export const EJS_DATA = 'https://cdn.emulatorjs.org/4.2.3/data/';
 
