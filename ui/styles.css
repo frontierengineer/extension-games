@@ -189,7 +189,7 @@
 
 /* ── App shell (shell-v2) ─────────────────────────────────────────────
    The Games app owns its whole content rect: a left rail (the saved-games
-   list) and a main pane (the library or one game), composed with the application-kit
+   list) and a main pane (the library or one game), composed with the extension-kit
    Split. */
 .games-app {
   height: 100%;

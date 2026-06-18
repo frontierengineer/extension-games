@@ -17,4 +17,4 @@ Games turns Frontier into a little retro arcade. Browse a library of classic con
 
 ## Install
 
-Install Games from the **Applications → Marketplace** tab in Frontier: find Games, click Install, and approve the access it asks for (it reaches out to the internet to fetch game catalogs). Frontier verifies the download before installing. Once it's in, the Games library appears in the sidebar — open it and start playing.
+Install Games from the **Extensions → Marketplace** tab in Frontier: find Games, click Install, and approve the access it asks for (it reaches out to the internet to fetch game catalogs). Frontier verifies the download before installing. Once it's in, the Games library appears in the sidebar — open it and start playing.

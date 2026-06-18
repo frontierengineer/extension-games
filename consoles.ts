@@ -1,4 +1,4 @@
-// The consoles this application can emulate, and where each one's games come
+// The consoles this extension can emulate, and where each one's games come
 // from. Shared by the browser ui/ and the host-side mcp/ capability (it has no
 // imports so it compiles cleanly in both the esbuild bundle and ts-node).
 //

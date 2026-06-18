@@ -11,7 +11,7 @@ import { fetchCatalogEntries } from './catalog';
 // Host-side games capability. The browser ui/ can't fetch ROMs itself — the
 // archive.org file responses don't send CORS headers — so the ui drops a
 // command marker in the store and we do the fetch here (over services.http,
-// which is allowlisted to archive.org in application.json and SSRF-guarded) and
+// which is allowlisted to archive.org in extension.json and SSRF-guarded) and
 // build the catalog. This is the same store-as-channel pattern spaces uses.
 
 const CATALOG_TTL_MS = 30 * 24 * 60 * 60 * 1000; // rebuild a catalog monthly

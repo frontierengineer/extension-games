@@ -68,7 +68,7 @@ export function GamesLibrary({
           <div className="games-library-title">Game Library</div>
           <div className="games-library-sub">
             Pick a console, find a game, and it’s downloaded and ready to play. ROMs are fetched on demand —
-            nothing ships with the application.
+            nothing ships with the extension.
           </div>
         </div>
         <button className="games-rom-btn games-rom-btn-ghost games-library-byo" onClick={onAddCustom}>
