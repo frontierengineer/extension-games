@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ApplicationSidebar, Split } from '@frontierengineer/ui';
-import type { UiV1, UiProvider, ApplicationHost } from '../../types';
+import { ExtensionSidebar, Split } from '@frontierengineer/ui';
+import type { UiV1, UiProvider, ExtensionHost } from '../../types';
 import { GamesSidebar } from './components/GamesSidebar';
 import { GameView } from './components/GameView';
 import { GamesLibrary } from './components/GamesLibrary';
@@ -10,7 +10,7 @@ import { CONSOLES, DEFAULT_CONSOLE } from './constants';
 import './styles.css';
 
 // ─────────────────────────────────────────────────────────────────────
-// The Games app (shell-v2). ONE ui.application.register that owns the whole content
+// The Games app (shell-v2). ONE ui.extension.register that owns the whole content
 // rect: a left rail listing the user's saved games (with a Browse action) and a
 // main pane that shows either the LIBRARY (browse archive.org catalogs + add a
 // game) or one running GAME. There is no host tab bar — the app holds the
@@ -22,7 +22,7 @@ import './styles.css';
 // What the main pane shows: the catalog browser, or one saved game by id.
 type Selection = { kind: 'library' } | { kind: 'game'; id: string };
 
-function GamesApp({ ui, host }: { ui: UiV1; host: ApplicationHost }) {
+function GamesApp({ ui, host }: { ui: UiV1; host: ExtensionHost }) {
   const list = useGames((a) => a.list);
   const loaded = useGames((a) => a.loaded);
 
@@ -55,7 +55,7 @@ function GamesApp({ ui, host }: { ui: UiV1; host: ApplicationHost }) {
   useEffect(() => host.lifecycle.onActivate(() => { void useGamesRaw().fetchList(); }), [host]);
 
   const sidebar = (
-    <ApplicationSidebar
+    <ExtensionSidebar
       header={<div className="games-sidebar-title">Games</div>}
       footer={
         <button
@@ -67,7 +67,7 @@ function GamesApp({ ui, host }: { ui: UiV1; host: ApplicationHost }) {
       }
     >
       <GamesSidebar navigate={navigate} confirm={(o) => ui.modals.confirm(o)} />
-    </ApplicationSidebar>
+    </ExtensionSidebar>
   );
 
   const main = selection.kind === 'game' ? (
@@ -95,7 +95,7 @@ export function register(uiProvider: UiProvider): void {
   initGames(ui.services.store);
 
   // "Add Game" is the create command — it opens the host modal and creates a BYO
-  // game. It runs in the controller realm (no openApplication), so the new game shows in
+  // game. It runs in the controller realm (no openExtension), so the new game shows in
   // the rail once the Games app is shown; the in-app library's Add takes the
   // richer path (a navigate callback) so the fresh game opens in the main pane.
   ui.commands.register({
@@ -106,15 +106,15 @@ export function register(uiProvider: UiProvider): void {
     run: () => { void showNewGameModal(ui); },
   });
 
-  // ONE app per application — the whole games experience lives inside this mount.
+  // ONE app per extension — the whole games experience lives inside this mount.
   let root: ReturnType<typeof createRoot> | null = null;
-  ui.application.register({
+  ui.extension.register({
     id: 'games',
     title: 'Games',
     // A game controller: a rounded body with a d-pad and two buttons.
     icon: 'M5 6.5H3.5a2 2 0 0 0-2 2l-.4 3a1.6 1.6 0 0 0 3 .8L4.5 11h7l.4 1.3a1.6 1.6 0 0 0 3-.8l-.4-3a2 2 0 0 0-2-2zM3.5 8.5h2M4.5 7.5v2M10.5 8.5h.01M12 9.5h.01',
     color: '#ef4444',
-    mount(host: ApplicationHost) {
+    mount(host: ExtensionHost) {
       root = createRoot(host.container);
       root.render(<GamesApp ui={ui} host={host} />);
       return () => { root?.unmount(); root = null; };
