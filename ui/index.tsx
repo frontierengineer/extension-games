@@ -10,7 +10,7 @@ import { CONSOLES, DEFAULT_CONSOLE } from './constants';
 import './styles.css';
 
 // ─────────────────────────────────────────────────────────────────────
-// The Games app (shell-v2). ONE ui.extension.register that owns the whole content
+// The Games app (shell-v2). ONE ui.application.register that owns the whole content
 // rect: a left rail listing the user's saved games (with a Browse action) and a
 // main pane that shows either the LIBRARY (browse archive.org catalogs + add a
 // game) or one running GAME. There is no host tab bar — the app holds the
@@ -108,7 +108,7 @@ export function register(uiProvider: UiProvider): void {
 
   // ONE app per extension — the whole games experience lives inside this mount.
   let root: ReturnType<typeof createRoot> | null = null;
-  ui.extension.register({
+  ui.application.register({
     id: 'games',
     title: 'Games',
     // A game controller: a rounded body with a d-pad and two buttons.
