@@ -1,6 +1,29 @@
 import { archiveMetadataUrl, type CatalogEntry } from '../consoles';
 import type { Http } from '../../types';
 
+// ── Legible network-failure helpers (shared with mcp/index.ts) ───────
+//
+// ROM/catalog availability is ultimately the archive.org item owner's concern,
+// so when a fetch fails we surface WHICH host + a hint at the likely cause
+// instead of a bare status — a user or the extension owner can self-diagnose
+// from the message (and the matching `[games]` / `[http]` server log lines).
+
+// "host/path" for an archive.org URL — the bare host + decoded file, not the
+// full query, so an error/log line names the item without a wall of URL.
+export function shortUrl(u: string): string {
+  try { const x = new URL(u); return x.host + decodeURIComponent(x.pathname); } catch { return u; }
+}
+
+// A human, actionable hint for the common archive.org HTTP statuses.
+export function httpStatusHint(status: number): string {
+  if (status === 404 || status === 403) return 'the item or file is not available on archive.org (removed, or this catalog item has no playable ROM)';
+  if (status === 429) return 'archive.org is rate-limiting downloads — wait a moment and try again';
+  if (status === 502 || status === 503 || status === 504) return 'archive.org is temporarily unavailable — try again shortly';
+  if (status >= 500) return 'archive.org returned a server error — try again shortly';
+  if (status >= 400) return 'archive.org rejected the request';
+  return 'unexpected response from archive.org';
+}
+
 // Build a console's game catalog from its archive.org item. The item stores one
 // archive (.zip/.7z) per game with No-Intro filenames like
 // "Super Mario World (USA).zip". We parse those into clean titles and collapse
@@ -83,11 +106,21 @@ export function parseCatalog(files: ArchiveFile[]): CatalogEntry[] {
 }
 
 export async function fetchCatalogEntries(http: Http, item: string): Promise<CatalogEntry[]> {
-  const res = await http.fetch(archiveMetadataUrl(item), { timeoutMs: 45_000 });
-  if (res.status < 200 || res.status >= 300) throw new Error(`archive.org metadata HTTP ${res.status}`);
+  const url = archiveMetadataUrl(item);
+  let res;
+  try {
+    res = await http.fetch(url, { timeoutMs: 45_000 });
+  } catch (err: any) {
+    // A THROWN error is our network/guard layer (timeout, SSRF/allowlist, DNS),
+    // not an archive.org status — name the host so the cause is unambiguous.
+    throw new Error(`couldn't reach ${shortUrl(url)}: ${err?.message || String(err)}`);
+  }
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(`archive.org metadata HTTP ${res.status} for item "${item}" — ${httpStatusHint(res.status)}`);
+  }
   let data: { files?: ArchiveFile[] };
-  try { data = JSON.parse(res.body); } catch { throw new Error('archive.org metadata was not valid JSON'); }
+  try { data = JSON.parse(res.body); } catch { throw new Error(`archive.org metadata for "${item}" was not valid JSON`); }
   const entries = parseCatalog(data.files || []);
-  if (entries.length === 0) throw new Error('no games found in archive item');
+  if (entries.length === 0) throw new Error(`no playable games found in archive item "${item}"`);
   return entries;
 }

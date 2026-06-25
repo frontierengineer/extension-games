@@ -6,7 +6,7 @@ import {
   metaKey, romKey, catalogKey, commandKey, COMMANDS_PREFIX,
   type SavedGame, type GameCommand,
 } from '../storage';
-import { fetchCatalogEntries } from './catalog';
+import { fetchCatalogEntries, httpStatusHint, shortUrl } from './catalog';
 
 // Host-side games capability. The browser ui/ can't fetch ROMs itself — the
 // archive.org file responses don't send CORS headers — so the ui drops a
@@ -33,10 +33,29 @@ async function readCatalog(store: Store, console: string): Promise<Catalog | nul
 }
 
 async function downloadRom(http: Http, url: string): Promise<Uint8Array> {
-  const res = await http.fetch(url, { responseType: 'bytes', timeoutMs: 120_000 });
-  if (res.status < 200 || res.status >= 300) throw new Error(`download HTTP ${res.status}`);
+  let res;
+  try {
+    res = await http.fetch(url, { responseType: 'bytes', timeoutMs: 120_000 });
+  } catch (err: any) {
+    // A THROWN error is our network/guard layer, NOT an archive.org status:
+    // a timeout, the 64MB response cap (large N64/GBA ROMs), the SSRF/allowlist
+    // guard, or DNS. Name the file + add a hint so our limit is distinguishable
+    // from an archive.org failure.
+    const msg = err?.message || String(err);
+    let hint = '';
+    if (/byte cap/.test(msg)) hint = ' — this ROM is larger than the download size limit';
+    else if (/timed out/.test(msg)) hint = ' — the download timed out (a large ROM over a slow link may need a retry)';
+    else if (/allowed network hosts|internal\/non-routable/.test(msg)) hint = ' — the download host is blocked by this extension\'s network allowlist';
+    throw new Error(`couldn't fetch ${shortUrl(url)}: ${msg}${hint}`);
+  }
+  // `res.url` is the FINAL hop after archive.org's 302 to a data node — name it
+  // (not the /download/ handle) so the failing host is the real one.
+  const where = shortUrl(res.url || url);
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(`archive.org returned HTTP ${res.status} for ${where} — ${httpStatusHint(res.status)}`);
+  }
   const buf = Buffer.from(res.body, 'base64');
-  if (buf.length === 0) throw new Error('downloaded file was empty');
+  if (buf.length === 0) throw new Error(`archive.org returned an empty file for ${where}`);
   return new Uint8Array(buf);
 }
 
@@ -61,14 +80,17 @@ export function register(mcpProvider: McpProvider): void {
         return;
       }
       await writeGame(store, { ...game, fetch: { state: 'fetching' } });
+      const romUrl = archiveDownloadUrl(spec.archiveItem, game.source.file);
+      console.log(`[games] downloading ${gameId} from ${shortUrl(romUrl)}`);
       try {
-        const bytes = await downloadRom(http, archiveDownloadUrl(spec.archiveItem, game.source.file));
+        const bytes = await downloadRom(http, romUrl);
         await store.putBytes(romKey(gameId), Buffer.from(bytes));
         await writeGame(store, { ...game, hasRom: true, fetch: { state: 'ready' } });
         console.log(`[games] installed ${gameId} (${bytes.length}B)`);
       } catch (err: any) {
-        await writeGame(store, { ...game, fetch: { state: 'error', error: err?.message || String(err) } });
-        console.error(`[games] install ${gameId} failed:`, err?.message || err);
+        const error = err?.message || String(err);
+        await writeGame(store, { ...game, fetch: { state: 'error', error } });
+        console.error(`[games] install ${gameId} failed: ${error}`);
       }
     } finally {
       installing.delete(gameId);
@@ -151,26 +173,37 @@ export function register(mcpProvider: McpProvider): void {
       required: ['console', 'query'],
     },
     handler: async (args: { console?: string; query?: string }): Promise<ToolResult> => {
-      const consoleId = String(args.console || '').trim();
-      const query = String(args.query || '').trim();
-      const spec = consoleSpec(consoleId);
-      if (!spec) return toText(`Unknown console "${consoleId}". Try one of: ${CONSOLES.map((c) => c.id).join(', ')}.`, true);
-      if (!query) return toText('Provide a game title to search for.', true);
+      // Wrap the WHOLE body: an unhandled rejection here (a store/IO hiccup, an
+      // archive.org edge) would escape the MCP registry — which calls the handler
+      // without a guard — and surface to the caller as an opaque
+      // `500 mcp handler error`. Convert ANY throw to a clear, isError ToolResult
+      // so the agent always gets a legible reason, never a bare 500.
+      try {
+        const consoleId = String(args.console || '').trim();
+        const query = String(args.query || '').trim();
+        const spec = consoleSpec(consoleId);
+        if (!spec) return toText(`Unknown console "${consoleId}". Try one of: ${CONSOLES.map((c) => c.id).join(', ')}.`, true);
+        if (!query) return toText('Provide a game title to search for.', true);
 
-      const catalog = await buildCatalog(consoleId);
-      const games = catalog?.games || [];
-      if (games.length === 0) return toText(`Couldn't load the ${spec.label} catalog (${catalog?.error || 'unknown error'}).`, true);
+        const catalog = await buildCatalog(consoleId);
+        const games = catalog?.games || [];
+        if (games.length === 0) return toText(`Couldn't load the ${spec.label} catalog (${catalog?.error || 'unknown error'}).`, true);
 
-      const q = query.toLowerCase();
-      const matches = games.filter((g) => g.title.toLowerCase().includes(q));
-      const pick = matches.sort((a, b) => a.title.length - b.title.length)[0];
-      if (!pick) return toText(`No ${spec.label} game matched "${query}".`, true);
+        const q = query.toLowerCase();
+        const matches = games.filter((g) => g.title.toLowerCase().includes(q));
+        const pick = matches.sort((a, b) => a.title.length - b.title.length)[0];
+        if (!pick) return toText(`No ${spec.label} game matched "${query}".`, true);
 
-      const id = await createGameMeta(store, pick.title, consoleId, pick.file);
-      await installGame(id);
-      const after = await readGame(store, id);
-      if (after?.fetch?.state === 'error') return toText(`Found "${pick.title}" but the download failed: ${after.fetch.error}`, true);
-      return toText(`Installed "${pick.title}" (${spec.label}). Open it from the Games sidebar to play.`);
+        const id = await createGameMeta(store, pick.title, consoleId, pick.file);
+        await installGame(id);
+        const after = await readGame(store, id);
+        if (after?.fetch?.state === 'error') return toText(`Found "${pick.title}" but the download failed: ${after.fetch.error}`, true);
+        return toText(`Installed "${pick.title}" (${spec.label}). Open it from the Games sidebar to play.`);
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        console.error(`[games] install_game failed: ${msg}`);
+        return toText(`Couldn't install that game: ${msg}`, true);
+      }
     },
   });
 }

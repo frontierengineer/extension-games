@@ -10,7 +10,14 @@
 // own, so battery saves and save states round-trip over postMessage and
 // persist in the extension store.
 
-export const EJS_DATA = 'https://cdn.emulatorjs.org/4.2.3/data/';
+// The pinned EmulatorJS CDN. The ORIGIN is declared in two places that MUST stay
+// in sync: the extension's `ui.frameHosts` (extension.json — widens the parent
+// webview CSP, which this sandboxed child frame inherits) and the srcdoc's own
+// <meta> CSP below (an explicit, self-contained policy so the contained frame is
+// allowed to run eval/WASM + load from this CDN even on a browser that doesn't
+// apply CSP inheritance to a sandboxed opaque-origin srcdoc frame).
+export const EJS_ORIGIN = 'https://cdn.emulatorjs.org';
+export const EJS_DATA = `${EJS_ORIGIN}/4.2.3/data/`;
 
 export const EMU_READY = 'ejs-ready';
 export const EMU_ROM = 'ejs-rom';
@@ -19,7 +26,21 @@ export const EMU_SAVE = 'ejs-save';
 export const EMU_STATE = 'ejs-state';
 
 export function emulatorSrcdoc(): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  // Explicit CSP for THIS opaque-origin sandboxed frame. It permits exactly what
+  // EmulatorJS needs — eval + WASM compilation, and code/styles/data from the
+  // pinned CDN — and nothing app-origin (the frame has no same-origin reach
+  // anyway). When the frame DOES inherit the parent webview policy (the common
+  // case), the two are enforced as an intersection; the parent's `ui` opt-in is
+  // widened to the same CDN so the intersection still allows it. When it does
+  // NOT inherit, this is the whole policy. Either way the frame can boot.
+  const csp = [
+    `default-src 'self' ${EJS_ORIGIN} blob: data:`,
+    `script-src 'self' ${EJS_ORIGIN} 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' blob:`,
+    `style-src 'self' ${EJS_ORIGIN} 'unsafe-inline'`,
+    `worker-src 'self' ${EJS_ORIGIN} blob:`,
+  ].join('; ');
+  return `<!doctype html><html><head><meta charset="utf-8">` +
+    `<meta http-equiv="Content-Security-Policy" content="${csp}"><style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden}
 #game{width:100%;height:100%}
 </style></head><body><div id="game"></div><script>
@@ -105,8 +126,14 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden}
       };
       var s=document.createElement('script');
       s.src=window.EJS_pathtodata+'loader.js';
-      s.onerror=function(){ fail('Failed to load EmulatorJS from its CDN.'); };
+      var settled=false;
+      s.onload=function(){ settled=true; };
+      s.onerror=function(){ settled=true; fail('Failed to load EmulatorJS from its CDN.'); };
       document.body.appendChild(s);
+      // A CSP-blocked script load fires NEITHER onload nor onerror in some
+      // engines, so without this watchdog the frame would just sit black. If
+      // loader.js hasn't resolved either way, surface it instead of hanging.
+      setTimeout(function(){ if(!settled) fail('Could not load EmulatorJS from its CDN — it may be blocked or unreachable.'); },15000);
     }catch(err){ fail(err && err.message || err); }
   });
   parent.postMessage({type:${JSON.stringify(EMU_READY)}},'*');
