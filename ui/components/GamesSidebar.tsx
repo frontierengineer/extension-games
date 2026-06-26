@@ -30,7 +30,7 @@ export function GamesSidebar({ navigate, confirm }: {
     return <div className="games-sidebar-empty">Loading…</div>;
   }
   if (list.length === 0) {
-    return <div className="games-sidebar-empty">No games yet. Use + to add one.</div>;
+    return <div className="games-sidebar-empty">No games yet. Open <strong>Browse library</strong> below to pick one, or add your own ROM.</div>;
   }
   return (
     <div className="games-sidebar-list">
