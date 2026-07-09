@@ -1,5 +1,5 @@
 // The consoles this extension can emulate, and where each one's games come
-// from. Shared by the browser ui/ and the host-side mcp/ capability (it has no
+// from. Shared by the browser surface/ and the host-side mcp/ capability (it has no
 // imports so it compiles cleanly in both the esbuild bundle and ts-node).
 //
 // Games are NOT bundled. For each console we point at one archive.org item — a

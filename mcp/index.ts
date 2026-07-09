@@ -8,8 +8,8 @@ import {
 } from '../storage';
 import { fetchCatalogEntries, httpStatusHint, shortUrl } from './catalog';
 
-// Host-side games capability. The browser ui/ can't fetch ROMs itself — the
-// archive.org file responses don't send CORS headers — so the ui drops a
+// Host-side games capability. The browser surface/ can't fetch ROMs itself — the
+// archive.org file responses don't send CORS headers — so the surface drops a
 // command marker in the store and we do the fetch here (over services.http,
 // which is allowlisted to archive.org in extension.json and SSRF-guarded) and
 // build the catalog. This is the same store-as-channel pattern spaces uses.
@@ -17,7 +17,9 @@ import { fetchCatalogEntries, httpStatusHint, shortUrl } from './catalog';
 const CATALOG_TTL_MS = 30 * 24 * 60 * 60 * 1000; // rebuild a catalog monthly
 
 async function readGame(store: Store, id: string): Promise<SavedGame | null> {
-  const raw = await store.get(metaKey(id)).catch(() => null);
+  // store.get returns null for a missing key, so a catch here would only mask a
+  // real store fault as "no such game"; let the boundary see it instead.
+  const raw = await store.get(metaKey(id));
   if (!raw) return null;
   try { return JSON.parse(raw) as SavedGame; } catch { return null; }
 }
@@ -27,7 +29,9 @@ async function writeGame(store: Store, game: SavedGame): Promise<void> {
 }
 
 async function readCatalog(store: Store, console: string): Promise<Catalog | null> {
-  const raw = await store.get(catalogKey(console)).catch(() => null);
+  // As in readGame: absence already reads back as null, so catching here would
+  // only bury a store fault behind "no catalog yet".
+  const raw = await store.get(catalogKey(console));
   if (!raw) return null;
   try { return JSON.parse(raw) as Catalog; } catch { return null; }
 }
@@ -131,7 +135,8 @@ export function register(mcpProvider: McpProvider): void {
     draining = true;
     try {
       let keys: string[];
-      try { keys = await store.list(COMMANDS_PREFIX); } catch { return; }
+      try { keys = await store.list(COMMANDS_PREFIX); }
+      catch (err: any) { console.error('[games] draining commands failed to list:', err?.message || err); return; }
       for (const key of keys) {
         if (!key.endsWith('.json')) continue;
         let cmd: GameCommand | null = null;
@@ -139,6 +144,7 @@ export function register(mcpProvider: McpProvider): void {
           const raw = await store.get(key);
           cmd = raw ? (JSON.parse(raw) as GameCommand) : null;
         } catch { cmd = null; }
+        // Consume the marker first so a failing command can't wedge the queue.
         await store.delete(key).catch(() => {});
         if (!cmd) continue;
         try {

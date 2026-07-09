@@ -1,4 +1,4 @@
-// The store contract shared by the browser ui/ and the host mcp/ capability.
+// The store contract shared by the browser surface/ and the host mcp/ capability.
 // Both reach the SAME per-extension key/value store ("games" namespace), so
 // these key helpers and record shapes are the wire format between them — the ui
 // writes a request, the host fulfils it. Keeping them in one (import-free) file
