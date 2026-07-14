@@ -3,7 +3,7 @@
   "defaultColor": "#ef4444",
   "description": "A retro console emulator (via EmulatorJS) that browses archive.org ROM catalogs and plays games in-browser, including your own ROMs.",
   "network": { "allowedHosts": ["archive.org"] },
-  "ui": {
+  "surface": {
     "allowEval": true,
     "frameHosts": ["cdn.emulatorjs.org"]
   }

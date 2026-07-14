@@ -1,4 +1,4 @@
-import type { McpProvider, Store, Http, ToolResult } from '../../types';
+import type { HostProvider, Store, Http, ToolResult } from '../../types';
 import {
   CONSOLES, consoleSpec, archiveDownloadUrl, type Catalog,
 } from '../consoles';
@@ -63,10 +63,10 @@ async function downloadRom(http: Http, url: string): Promise<Uint8Array> {
   return new Uint8Array(buf);
 }
 
-export function register(mcpProvider: McpProvider): void {
-  const mcp = mcpProvider.version(1);
-  const store: Store = mcp.services.store;
-  const http: Http = mcp.services.http;
+export function register(hostProvider: HostProvider): void {
+  const h = hostProvider.version(1);
+  const store: Store = h.services.store;
+  const http: Http = h.services.http;
 
   const installing = new Set<string>();
   const buildingCatalog = new Set<string>();
@@ -164,7 +164,7 @@ export function register(mcpProvider: McpProvider): void {
   void drainCommands();
 
   // ── MCP tool: let the agent install a game by name ──────────────
-  mcp.registerTool({
+  h.mcp.registerTool({
     name: 'install_game',
     title: 'Install Game',
     description:

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ExtensionSidebar, Split } from '@frontierengineer/ui';
-import type { UiV1, UiProvider, ExtensionHost } from '../../types';
+import type { SurfaceV1, SurfaceProvider, ExtensionHost } from '../../types';
 import { GamesSidebar } from './components/GamesSidebar';
 import { GameView } from './components/GameView';
 import { GamesLibrary } from './components/GamesLibrary';
@@ -22,7 +22,7 @@ import './styles.css';
 // What the main pane shows: the catalog browser, or one saved game by id.
 type Selection = { kind: 'library' } | { kind: 'game'; id: string };
 
-function GamesApp({ ui, host }: { ui: UiV1; host: ExtensionHost }) {
+function GamesApp({ ui, host }: { ui: SurfaceV1; host: ExtensionHost }) {
   const list = useGames((a) => a.list);
   const loaded = useGames((a) => a.loaded);
 
@@ -93,7 +93,7 @@ function GamesApp({ ui, host }: { ui: UiV1; host: ExtensionHost }) {
   );
 }
 
-export function register(uiProvider: UiProvider): void {
+export function register(uiProvider: SurfaceProvider): void {
   const ui = uiProvider.version(1);
   initGames(ui.services.store);
 
@@ -125,7 +125,7 @@ export function register(uiProvider: UiProvider): void {
   });
 }
 
-async function showNewGameModal(ui: UiV1, onCreated?: (path: string) => void): Promise<void> {
+async function showNewGameModal(ui: SurfaceV1, onCreated?: (path: string) => void): Promise<void> {
   const result = await ui.modals.prompt({
     title: 'Add Your Own ROM',
     fields: [
