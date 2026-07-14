@@ -52,7 +52,10 @@ function GamesApp({ ui, host }: { ui: UiV1; host: ExtensionHost }) {
   // Refresh the saved-games list on COMMIT (the user switched here) — a game may
   // have been added/removed elsewhere while this app was hidden. A peek is a
   // glance and takes no such side effect.
-  useEffect(() => host.lifecycle.onActivate(() => { void useGamesRaw().fetchList(); }), [host]);
+  useEffect(() => {
+    const sub = host.lifecycle.onActivate(() => { void useGamesRaw().fetchList(); });
+    return () => sub.unsubscribe();
+  }, [host]);
 
   const sidebar = (
     <ExtensionSidebar
@@ -66,7 +69,7 @@ function GamesApp({ ui, host }: { ui: UiV1; host: ExtensionHost }) {
         </button>
       }
     >
-      <GamesSidebar navigate={navigate} confirm={(o) => ui.modals.confirm(o)} />
+      <GamesSidebar navigate={navigate} confirm={(o) => ui.modals.confirm(o).then((r) => r === true)} />
     </ExtensionSidebar>
   );
 

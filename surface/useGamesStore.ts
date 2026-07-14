@@ -83,7 +83,10 @@ const gamesApi: GamesApi = {
   getState: async (id) => getState(need(), id),
   getCatalog: async (consoleId) => getCatalog(need(), consoleId),
   requestCatalog: async (consoleId) => requestCatalog(need(), consoleId),
-  watch: (prefix, handler) => need().watch(prefix, handler),
+  watch: (prefix, handler) => {
+    const sub = need().watch(prefix, handler);
+    return () => sub.unsubscribe();
+  },
 };
 
 export function useGames<T>(selector: (api: GamesApi) => T): T {

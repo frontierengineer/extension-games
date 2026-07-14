@@ -17,23 +17,23 @@ import { fetchCatalogEntries, httpStatusHint, shortUrl } from './catalog';
 const CATALOG_TTL_MS = 30 * 24 * 60 * 60 * 1000; // rebuild a catalog monthly
 
 async function readGame(store: Store, id: string): Promise<SavedGame | null> {
-  // store.get returns null for a missing key, so a catch here would only mask a
-  // real store fault as "no such game"; let the boundary see it instead.
-  const raw = await store.get(metaKey(id));
-  if (!raw) return null;
-  try { return JSON.parse(raw) as SavedGame; } catch { return null; }
+  // store.getJson resolves ok(null) for a missing key, so a catch here would only
+  // mask a real store fault as "no such game"; let the boundary see it instead.
+  const r = await store.getJson<SavedGame>(metaKey(id));
+  if (!r.ok || r.value === null) return null;
+  return r.value;
 }
 
 async function writeGame(store: Store, game: SavedGame): Promise<void> {
-  await store.put(metaKey(game.id), JSON.stringify(game, null, 2));
+  await store.putJson(metaKey(game.id), game);
 }
 
 async function readCatalog(store: Store, console: string): Promise<Catalog | null> {
-  // As in readGame: absence already reads back as null, so catching here would
+  // As in readGame: absence already reads back as ok(null), so catching here would
   // only bury a store fault behind "no catalog yet".
-  const raw = await store.get(catalogKey(console));
-  if (!raw) return null;
-  try { return JSON.parse(raw) as Catalog; } catch { return null; }
+  const r = await store.getJson<Catalog>(catalogKey(console));
+  if (!r.ok || r.value === null) return null;
+  return r.value;
 }
 
 async function downloadRom(http: Http, url: string): Promise<Uint8Array> {
@@ -120,7 +120,7 @@ export function register(mcpProvider: McpProvider): void {
         catalog = { builtAt: new Date().toISOString(), item: spec.archiveItem, error: err?.message || String(err) };
         console.error(`[games] catalog build ${consoleId} failed:`, err?.message || err);
       }
-      await store.put(catalogKey(consoleId), JSON.stringify(catalog));
+      await store.putJson(catalogKey(consoleId), catalog);
       return catalog;
     } finally {
       buildingCatalog.delete(consoleId);
@@ -141,8 +141,8 @@ export function register(mcpProvider: McpProvider): void {
         if (!key.endsWith('.json')) continue;
         let cmd: GameCommand | null = null;
         try {
-          const raw = await store.get(key);
-          cmd = raw ? (JSON.parse(raw) as GameCommand) : null;
+          const r = await store.getJson<GameCommand>(key);
+          cmd = r.ok ? r.value : null;
         } catch { cmd = null; }
         // Consume the marker first so a failing command can't wedge the queue.
         await store.delete(key).catch(() => {});
@@ -224,8 +224,8 @@ async function createGameMeta(store: Store, name: string, consoleId: string, fil
   const base = slugify(name);
   let id = base;
   let n = 2;
-  while (await store.get(metaKey(id))) id = `${base}-${n++}`;
+  while (await store.getString(metaKey(id))) id = `${base}-${n++}`;
   const game: SavedGame = { id, name, console: consoleId, hasRom: false, source: { console: consoleId, file }, fetch: { state: 'pending' } };
-  await store.put(metaKey(id), JSON.stringify(game, null, 2));
+  await store.putJson(metaKey(id), game);
   return id;
 }

@@ -26,34 +26,30 @@ export async function listGames(store: Store): Promise<SavedGame[]> {
   const out: SavedGame[] = [];
   for (const key of await store.list(GAMES_PREFIX)) {
     if (!isGameMetaKey(key)) continue;
-    const raw = await store.get(key);
-    if (!raw) continue;
-    try {
-      const parsed = JSON.parse(raw) as Partial<SavedGame>;
-      out.push(normalize(parsed, key.slice(GAMES_PREFIX.length + 1, -'.json'.length)));
-    } catch {
-      /* skip a corrupt entry rather than break the whole list */
-    }
+    // Skip a missing or corrupt entry rather than break the whole list.
+    const r = await store.getJson<Partial<SavedGame>>(key);
+    if (!r.ok || r.value === null) continue;
+    out.push(normalize(r.value, key.slice(GAMES_PREFIX.length + 1, -'.json'.length)));
   }
   out.sort((a, b) => a.name.localeCompare(b.name));
   return out;
 }
 
 export async function getGame(store: Store, id: string): Promise<SavedGame | null> {
-  const raw = await store.get(metaKey(id));
-  if (!raw) return null;
-  try { return normalize(JSON.parse(raw) as Partial<SavedGame>, id); } catch { return null; }
+  const r = await store.getJson<Partial<SavedGame>>(metaKey(id));
+  if (!r.ok || r.value === null) return null;
+  return normalize(r.value, id);
 }
 
 async function writeGame(store: Store, game: SavedGame): Promise<void> {
-  await store.put(metaKey(game.id), JSON.stringify(game, null, 2));
+  await store.putJson(metaKey(game.id), game);
 }
 
 async function freshId(store: Store, name: string): Promise<string> {
   const base = slugify(name);
   let id = base;
   let n = 2;
-  while (await store.get(metaKey(id))) id = `${base}-${n++}`;
+  while (await store.getString(metaKey(id))) id = `${base}-${n++}`;
   return id;
 }
 
@@ -137,9 +133,9 @@ export async function getState(store: Store, id: string): Promise<Uint8Array | n
 // ── Catalog (built by the host; read here) ───────────────────────────
 
 export async function getCatalog(store: Store, consoleId: string): Promise<Catalog | null> {
-  const raw = await store.get(catalogKey(consoleId));
-  if (!raw) return null;
-  try { return JSON.parse(raw) as Catalog; } catch { return null; }
+  const r = await store.getJson<Catalog>(catalogKey(consoleId));
+  if (!r.ok || r.value === null) return null;
+  return r.value;
 }
 
 export async function requestCatalog(store: Store, consoleId: string): Promise<void> {
@@ -149,5 +145,5 @@ export async function requestCatalog(store: Store, consoleId: string): Promise<v
 let commandSeq = 0;
 async function dropCommand(store: Store, cmd: GameCommand): Promise<void> {
   const rid = `${Date.now().toString(36)}-${(commandSeq++).toString(36)}`;
-  await store.put(commandKey(rid), JSON.stringify(cmd));
+  await store.putJson(commandKey(rid), cmd);
 }
