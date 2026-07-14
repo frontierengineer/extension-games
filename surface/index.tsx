@@ -110,9 +110,12 @@ export function register(surfaceProvider: SurfaceProvider): void {
         id: 'games.new',
         label: 'Add Game (your own ROM)',
         category: 'Games',
+        defaultKey: null,
         group: 'create',
+        actionId: null,
         run: () => { void showNewGameModal(ctx.services); },
       });
+      return null;
     },
   });
 
@@ -124,11 +127,12 @@ export function register(surfaceProvider: SurfaceProvider): void {
     // A game controller: a rounded body with a d-pad and two buttons.
     icon: 'M5 6.5H3.5a2 2 0 0 0-2 2l-.4 3a1.6 1.6 0 0 0 3 .8L4.5 11h7l.4 1.3a1.6 1.6 0 0 0 3-.8l-.4-3a2 2 0 0 0-2-2zM3.5 8.5h2M4.5 7.5v2M10.5 8.5h.01M12 9.5h.01',
     color: '#ef4444',
+    requires: null,
     mount(host: ExtensionHost) {
       initGames(host.services.store);
       root = createRoot(host.container);
       root.render(<GamesApp host={host} />);
-      return () => { root?.unmount(); root = null; };
+      return { dispose: () => { root?.unmount(); root = null; } };
     },
   });
 }
@@ -136,16 +140,19 @@ export function register(surfaceProvider: SurfaceProvider): void {
 async function showNewGameModal(services: SurfaceServices, onCreated?: (path: string) => void): Promise<void> {
   const result = await services.modals.prompt({
     title: 'Add Your Own ROM',
+    description: null,
     fields: [
       {
         key: 'console',
         label: 'Console',
         type: 'select',
+        placeholder: null,
+        options: CONSOLES.map((c) => ({ value: c.id, label: c.label })),
         required: true,
         default: DEFAULT_CONSOLE,
-        options: CONSOLES.map((c) => ({ value: c.id, label: c.label })),
+        help: null,
       },
-      { key: 'name', label: 'Game name', type: 'string', placeholder: 'Super Demo Bros', required: true },
+      { key: 'name', label: 'Game name', type: 'string', placeholder: 'Super Demo Bros', options: null, required: true, default: null, help: null },
     ],
     submitLabel: 'Add',
   });

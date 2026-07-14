@@ -25,7 +25,7 @@ async function readGame(store: Store, id: string): Promise<SavedGame | null> {
 }
 
 async function writeGame(store: Store, game: SavedGame): Promise<void> {
-  await store.putJson(metaKey(game.id), game);
+  await store.putJson({ key: metaKey(game.id), value: game });
 }
 
 async function readCatalog(store: Store, console: string): Promise<Catalog | null> {
@@ -39,7 +39,7 @@ async function readCatalog(store: Store, console: string): Promise<Catalog | nul
 async function downloadRom(http: Http, url: string): Promise<Uint8Array> {
   let res;
   try {
-    res = await http.fetch(url, { responseType: 'bytes', timeoutMs: 120_000 });
+    res = await http.fetch({ url, method: null, headers: null, body: null, timeoutMs: 120_000, responseType: 'bytes' });
   } catch (err: any) {
     // A THROWN error is our network/guard layer, NOT an archive.org status:
     // a timeout, the 64MB response cap (large N64/GBA ROMs), the SSRF/allowlist
@@ -88,7 +88,7 @@ export function register(hostProvider: HostProvider): void {
       console.log(`[games] downloading ${gameId} from ${shortUrl(romUrl)}`);
       try {
         const bytes = await downloadRom(http, romUrl);
-        await store.putBytes(romKey(gameId), Buffer.from(bytes));
+        await store.putBytes({ key: romKey(gameId), value: Buffer.from(bytes) });
         await writeGame(store, { ...game, hasRom: true, fetch: { state: 'ready' } });
         console.log(`[games] installed ${gameId} (${bytes.length}B)`);
       } catch (err: any) {
@@ -120,7 +120,7 @@ export function register(hostProvider: HostProvider): void {
         catalog = { builtAt: new Date().toISOString(), item: spec.archiveItem, error: err?.message || String(err) };
         console.error(`[games] catalog build ${consoleId} failed:`, err?.message || err);
       }
-      await store.putJson(catalogKey(consoleId), catalog);
+      await store.putJson({ key: catalogKey(consoleId), value: catalog });
       return catalog;
     } finally {
       buildingCatalog.delete(consoleId);
@@ -135,7 +135,7 @@ export function register(hostProvider: HostProvider): void {
     draining = true;
     try {
       let keys: string[];
-      try { keys = await store.list(COMMANDS_PREFIX); }
+      try { keys = (await store.list(COMMANDS_PREFIX)).keys; }
       catch (err: any) { console.error('[games] draining commands failed to list:', err?.message || err); return; }
       for (const key of keys) {
         if (!key.endsWith('.json')) continue;
@@ -224,8 +224,8 @@ async function createGameMeta(store: Store, name: string, consoleId: string, fil
   const base = slugify(name);
   let id = base;
   let n = 2;
-  while (await store.getString(metaKey(id))) id = `${base}-${n++}`;
+  while ((await store.getString(metaKey(id))).value) id = `${base}-${n++}`;
   const game: SavedGame = { id, name, console: consoleId, hasRom: false, source: { console: consoleId, file }, fetch: { state: 'pending' } };
-  await store.putJson(metaKey(id), game);
+  await store.putJson({ key: metaKey(id), value: game });
   return id;
 }

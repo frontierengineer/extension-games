@@ -24,7 +24,7 @@ function normalize(parsed: Partial<SavedGame>, fallbackId: string): SavedGame {
 
 export async function listGames(store: Store): Promise<SavedGame[]> {
   const out: SavedGame[] = [];
-  for (const key of await store.list(GAMES_PREFIX)) {
+  for (const key of (await store.list(GAMES_PREFIX)).keys) {
     if (!isGameMetaKey(key)) continue;
     // Skip a missing or corrupt entry rather than break the whole list.
     const r = await store.getJson<Partial<SavedGame>>(key);
@@ -42,14 +42,14 @@ export async function getGame(store: Store, id: string): Promise<SavedGame | nul
 }
 
 async function writeGame(store: Store, game: SavedGame): Promise<void> {
-  await store.putJson(metaKey(game.id), game);
+  await store.putJson({ key: metaKey(game.id), value: game });
 }
 
 async function freshId(store: Store, name: string): Promise<string> {
   const base = slugify(name);
   let id = base;
   let n = 2;
-  while (await store.getString(metaKey(id))) id = `${base}-${n++}`;
+  while ((await store.getString(metaKey(id))).value) id = `${base}-${n++}`;
   return id;
 }
 
@@ -96,7 +96,7 @@ export async function deleteGame(store: Store, id: string): Promise<void> {
 }
 
 export async function putRom(store: Store, id: string, bytes: Uint8Array): Promise<void> {
-  await store.putBytes(romKey(id), bytes);
+  await store.putBytes({ key: romKey(id), value: bytes });
   const game = await getGame(store, id);
   if (game && !game.hasRom) await writeGame(store, { ...game, hasRom: true });
 }
@@ -111,23 +111,23 @@ function standalone(bytes: Uint8Array | null): Uint8Array | null {
 }
 
 export async function getRom(store: Store, id: string): Promise<Uint8Array | null> {
-  return standalone(await store.getBytes(romKey(id)));
+  return standalone((await store.getBytes(romKey(id))).value);
 }
 
 export async function putSave(store: Store, id: string, bytes: Uint8Array): Promise<void> {
-  await store.putBytes(saveKey(id), bytes);
+  await store.putBytes({ key: saveKey(id), value: bytes });
 }
 
 export async function getSave(store: Store, id: string): Promise<Uint8Array | null> {
-  return standalone(await store.getBytes(saveKey(id)));
+  return standalone((await store.getBytes(saveKey(id))).value);
 }
 
 export async function putState(store: Store, id: string, bytes: Uint8Array): Promise<void> {
-  await store.putBytes(stateKey(id), bytes);
+  await store.putBytes({ key: stateKey(id), value: bytes });
 }
 
 export async function getState(store: Store, id: string): Promise<Uint8Array | null> {
-  return standalone(await store.getBytes(stateKey(id)));
+  return standalone((await store.getBytes(stateKey(id))).value);
 }
 
 // ── Catalog (built by the host; read here) ───────────────────────────
@@ -145,5 +145,5 @@ export async function requestCatalog(store: Store, consoleId: string): Promise<v
 let commandSeq = 0;
 async function dropCommand(store: Store, cmd: GameCommand): Promise<void> {
   const rid = `${Date.now().toString(36)}-${(commandSeq++).toString(36)}`;
-  await store.putJson(commandKey(rid), cmd);
+  await store.putJson({ key: commandKey(rid), value: cmd });
 }

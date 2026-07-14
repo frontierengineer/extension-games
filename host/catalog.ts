@@ -109,7 +109,7 @@ export async function fetchCatalogEntries(http: Http, item: string): Promise<Cat
   const url = archiveMetadataUrl(item);
   let res;
   try {
-    res = await http.fetch(url, { timeoutMs: 45_000 });
+    res = await http.fetch({ url, method: null, headers: null, body: null, timeoutMs: 45_000, responseType: null });
   } catch (err: any) {
     // A THROWN error is our network/guard layer (timeout, SSRF/allowlist, DNS),
     // not an archive.org status — name the host so the cause is unambiguous.

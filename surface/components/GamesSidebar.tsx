@@ -22,6 +22,7 @@ export function GamesSidebar({ navigate, confirm }: {
       message: `Delete "${g.name}"? Its ROM and save data are removed. This cannot be undone.`,
       confirmLabel: 'Delete',
       danger: true,
+      extraActionLabel: null,
     });
     if (ok) void remove(g.id);
   };
