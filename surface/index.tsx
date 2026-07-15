@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ExtensionSidebar, Split } from '@frontierengineer/ui';
-import type { SurfaceProvider, ExtensionHost, SurfaceComponentContext } from '../../types';
+import type { SurfaceProvider, ViewHost, SurfaceComponentContext } from '../../types';
 import { GamesSidebar } from './components/GamesSidebar';
 import { GameView } from './components/GameView';
 import { GamesLibrary } from './components/GamesLibrary';
@@ -22,7 +22,7 @@ import './styles.css';
 // What the main pane shows: the catalog browser, or one saved game by id.
 type Selection = { kind: 'library' } | { kind: 'game'; id: string };
 
-function GamesApp({ host }: { host: ExtensionHost }) {
+function GamesApp({ host }: { host: ViewHost }) {
   const list = useGames((a) => a.list);
   const loaded = useGames((a) => a.loaded);
 
@@ -119,7 +119,6 @@ export function register(surfaceProvider: SurfaceProvider): void {
         // bespoke prompt modal, so there is no host-generated schema.
         input: null,
         output: null,
-        realm: null,
         run: () => { void showNewGameModal(ctx); },
       });
       return {};
@@ -135,7 +134,7 @@ export function register(surfaceProvider: SurfaceProvider): void {
     icon: 'M5 6.5H3.5a2 2 0 0 0-2 2l-.4 3a1.6 1.6 0 0 0 3 .8L4.5 11h7l.4 1.3a1.6 1.6 0 0 0 3-.8l-.4-3a2 2 0 0 0-2-2zM3.5 8.5h2M4.5 7.5v2M10.5 8.5h.01M12 9.5h.01',
     color: '#ef4444',
     requires: null,
-    mount(host: ExtensionHost) {
+    mount(host: ViewHost) {
       initGames(host.store);
       root = createRoot(host.container);
       root.render(<GamesApp host={host} />);
