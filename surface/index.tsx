@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ExtensionSidebar, Split } from '@frontierengineer/ui';
-import type { SurfaceProvider, ExtensionHost, SurfaceServices } from '../../types';
+import type { SurfaceProvider, ExtensionHost, SurfaceComponentContext } from '../../types';
 import { GamesSidebar } from './components/GamesSidebar';
 import { GameView } from './components/GameView';
 import { GamesLibrary } from './components/GamesLibrary';
@@ -49,9 +49,8 @@ function GamesApp({ host }: { host: ExtensionHost }) {
     }
   }, [selection, loaded, list]);
 
-  // Refresh the saved-games list on COMMIT (the user switched here) — a game may
-  // have been added/removed elsewhere while this app was hidden. A peek is a
-  // glance and takes no such side effect.
+  // Refresh the saved-games list on activation (the user switched here) — a game
+  // may have been added/removed elsewhere while this app was hidden.
   useEffect(() => {
     const sub = host.lifecycle.onActivate(() => { void useGamesRaw().fetchList(); });
     return () => sub.unsubscribe();
@@ -69,14 +68,14 @@ function GamesApp({ host }: { host: ExtensionHost }) {
         </button>
       }
     >
-      <GamesSidebar navigate={navigate} confirm={(o) => host.services.modals.confirm(o).then((r) => r === true)} />
+      <GamesSidebar navigate={navigate} confirm={(o) => host.modals.confirm(o).then((r) => r === true)} />
     </ExtensionSidebar>
   );
 
   const main = selection.kind === 'game' ? (
     <GameView key={selection.id} gameId={selection.id} navigate={navigate} />
   ) : (
-    <GamesLibrary navigate={navigate} onAddCustom={() => { void showNewGameModal(host.services, navigate); }} />
+    <GamesLibrary navigate={navigate} onAddCustom={() => { void showNewGameModal(host, navigate); }} />
   );
 
   return (
@@ -97,25 +96,33 @@ export function register(surfaceProvider: SurfaceProvider): void {
   const surface = surfaceProvider.version(1);
 
   // The DAEMON: the always-on headless component that hosts the extension's
-  // background logic. It seeds the games store from its own services and declares
-  // the "Add Game" command. "Add Game" is the create command — it opens the host
-  // modal and creates a BYO game from the daemon (no visible surface required), so
-  // the new game shows in the rail once the Games app is shown; the in-app
-  // library's Add takes the richer path (a navigate callback) so the fresh game
-  // opens in the main pane.
+  // background logic. It seeds the games store from its own context and declares
+  // the "Add Game" action. It is a zero-argument (input-null) action — invoked
+  // from the palette it runs directly, opening the host prompt modal and creating
+  // a BYO game from the daemon (no visible surface required), so the new game
+  // shows in the rail once the Games app is shown; the in-app library's Add takes
+  // the richer path (a navigate callback) so the fresh game opens in the main pane.
   surface.daemon.register({
     mount(ctx) {
-      initGames(ctx.services.store);
-      ctx.commands.register({
+      initGames(ctx.store);
+      ctx.actions.register({
         id: 'games.new',
-        label: 'Add Game (your own ROM)',
+        title: 'Add Game (your own ROM)',
+        description:
+          'Add a game from one of your own ROM files to the Games library. Opens a dialog ' +
+          'that asks for the console and a name for the game, then saves it so it appears in ' +
+          'the Games rail. Same as the "Browse library" / Add flow inside the Games app.',
         category: 'Games',
         defaultKey: null,
         group: 'create',
-        actionId: null,
-        run: () => { void showNewGameModal(ctx.services); },
+        // Input-null: the create flow gathers its own console + name through a
+        // bespoke prompt modal, so there is no host-generated schema.
+        input: null,
+        output: null,
+        realm: null,
+        run: () => { void showNewGameModal(ctx); },
       });
-      return null;
+      return {};
     },
   });
 
@@ -129,7 +136,7 @@ export function register(surfaceProvider: SurfaceProvider): void {
     color: '#ef4444',
     requires: null,
     mount(host: ExtensionHost) {
-      initGames(host.services.store);
+      initGames(host.store);
       root = createRoot(host.container);
       root.render(<GamesApp host={host} />);
       return { dispose: () => { root?.unmount(); root = null; } };
@@ -137,8 +144,8 @@ export function register(surfaceProvider: SurfaceProvider): void {
   });
 }
 
-async function showNewGameModal(services: SurfaceServices, onCreated?: (path: string) => void): Promise<void> {
-  const result = await services.modals.prompt({
+async function showNewGameModal(context: SurfaceComponentContext, onCreated?: (path: string) => void): Promise<void> {
+  const result = await context.modals.prompt({
     title: 'Add Your Own ROM',
     description: null,
     fields: [
