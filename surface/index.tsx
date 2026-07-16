@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ExtensionSidebar, Split } from '@frontierengineer/ui';
-import type { SurfaceProvider, ViewHost, SurfaceComponentContext } from '../../types';
+import type { SurfaceProvider, SurfaceViewContext, SurfaceContext } from '../../types';
 import { GamesSidebar } from './components/GamesSidebar';
 import { GameView } from './components/GameView';
 import { GamesLibrary } from './components/GamesLibrary';
@@ -22,7 +22,7 @@ import './styles.css';
 // What the main pane shows: the catalog browser, or one saved game by id.
 type Selection = { kind: 'library' } | { kind: 'game'; id: string };
 
-function GamesApp({ host }: { host: ViewHost }) {
+function GamesApp({ context }: { context: SurfaceViewContext }) {
   const list = useGames((a) => a.list);
   const loaded = useGames((a) => a.loaded);
 
@@ -52,9 +52,9 @@ function GamesApp({ host }: { host: ViewHost }) {
   // Refresh the saved-games list on activation (the user switched here) — a game
   // may have been added/removed elsewhere while this app was hidden.
   useEffect(() => {
-    const sub = host.lifecycle.onActivate(() => { void useGamesRaw().fetchList(); });
+    const sub = context.lifecycle.onActivate(() => { void useGamesRaw().fetchList(); });
     return () => sub.unsubscribe();
-  }, [host]);
+  }, [context]);
 
   const sidebar = (
     <ExtensionSidebar
@@ -68,14 +68,14 @@ function GamesApp({ host }: { host: ViewHost }) {
         </button>
       }
     >
-      <GamesSidebar navigate={navigate} confirm={(o) => host.modals.confirm(o).then((r) => r === true)} />
+      <GamesSidebar navigate={navigate} confirm={(o) => context.modals.confirm(o).then((r) => r === true)} />
     </ExtensionSidebar>
   );
 
   const main = selection.kind === 'game' ? (
     <GameView key={selection.id} gameId={selection.id} navigate={navigate} />
   ) : (
-    <GamesLibrary navigate={navigate} onAddCustom={() => { void showNewGameModal(host, navigate); }} />
+    <GamesLibrary navigate={navigate} onAddCustom={() => { void showNewGameModal(context, navigate); }} />
   );
 
   return (
@@ -134,16 +134,16 @@ export function register(surfaceProvider: SurfaceProvider): void {
     icon: 'M5 6.5H3.5a2 2 0 0 0-2 2l-.4 3a1.6 1.6 0 0 0 3 .8L4.5 11h7l.4 1.3a1.6 1.6 0 0 0 3-.8l-.4-3a2 2 0 0 0-2-2zM3.5 8.5h2M4.5 7.5v2M10.5 8.5h.01M12 9.5h.01',
     color: '#ef4444',
     requires: null,
-    mount(host: ViewHost) {
-      initGames(host.store);
-      root = createRoot(host.container);
-      root.render(<GamesApp host={host} />);
+    mount(context: SurfaceViewContext) {
+      initGames(context.store);
+      root = createRoot(context.container);
+      root.render(<GamesApp context={context} />);
       return { dispose: () => { root?.unmount(); root = null; } };
     },
   });
 }
 
-async function showNewGameModal(context: SurfaceComponentContext, onCreated?: (path: string) => void): Promise<void> {
+async function showNewGameModal(context: SurfaceContext, onCreated?: (path: string) => void): Promise<void> {
   const result = await context.modals.prompt({
     title: 'Add Your Own ROM',
     description: null,

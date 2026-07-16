@@ -1,4 +1,4 @@
-import type { HostProvider, HostDaemonHost, Store, Http, ToolResult } from '../../types';
+import type { HostProvider, HostDaemonContext, Store, Http, ToolResult } from '../../types';
 import {
   CONSOLES, consoleSpec, archiveDownloadUrl, type Catalog,
 } from '../consoles';
@@ -10,7 +10,7 @@ import { fetchCatalogEntries, httpStatusHint, shortUrl } from './catalog';
 
 // Host-side games capability. The browser surface/ can't fetch ROMs itself — the
 // archive.org file responses don't send CORS headers — so the surface drops a
-// command marker in the store and we do the fetch here (over host.http, which is
+// command marker in the store and we do the fetch here (over context.http, which is
 // allowlisted to archive.org in extension.json and SSRF-guarded) and build the
 // catalog. This is the same store-as-channel pattern spaces uses.
 
@@ -66,16 +66,16 @@ async function downloadRom(http: Http, url: string): Promise<Uint8Array> {
 export function register(hostProvider: HostProvider): void {
   const h = hostProvider.version(1);
   // The host bundle is a single daemon: all logic and capability live inside its
-  // mount(), which receives the flat HostDaemonHost and returns the teardown.
+  // mount(), which receives the flat HostDaemonContext and returns the teardown.
   h.daemon.register({ mount });
 }
 
 // The games daemon. Drains the surface's store-queued commands (install a ROM,
 // build a catalog) and registers the install_game MCP tool, all over the flat
-// host handed at mount. Returns a dispose that drops the store watch at unload.
-function mount(host: HostDaemonHost): { dispose?: () => void } {
-  const store: Store = host.store;
-  const http: Http = host.http;
+// context handed at mount. Returns a dispose that drops the store watch at unload.
+function mount(context: HostDaemonContext): { dispose?: () => void } {
+  const store: Store = context.store;
+  const http: Http = context.http;
 
   const installing = new Set<string>();
   const buildingCatalog = new Set<string>();
@@ -173,7 +173,7 @@ function mount(host: HostDaemonHost): { dispose?: () => void } {
   void drainCommands();
 
   // ── MCP tool: let the agent install a game by name ──────────────
-  host.mcp.registerTool({
+  context.mcp.registerTool({
     name: 'install_game',
     title: 'Install Game',
     description:
