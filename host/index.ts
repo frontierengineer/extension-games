@@ -39,7 +39,7 @@ async function readCatalog(store: Store, console: string): Promise<Catalog | nul
 async function downloadRom(http: Http, url: string): Promise<Uint8Array> {
   let res;
   try {
-    res = await http.fetch({ url, method: null, headers: null, body: null, timeoutMs: 120_000, responseType: 'bytes' });
+    res = await http.fetch(url, { method: null, headers: {}, body: null, timeoutMs: 120_000, responseType: 'bytes' });
   } catch (err: any) {
     // A THROWN error is our network/guard layer, NOT an archive.org status:
     // a timeout, the 64MB response cap (large N64/GBA ROMs), the SSRF/allowlist
