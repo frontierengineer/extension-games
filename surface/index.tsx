@@ -52,7 +52,7 @@ function GamesApp({ context }: { context: SurfaceViewContext }) {
   // Refresh the saved-games list on activation (the user switched here) — a game
   // may have been added/removed elsewhere while this app was hidden.
   useEffect(() => {
-    const sub = context.lifecycle.onActivate(() => { void useGamesRaw().fetchList(); });
+    const sub = context.lifecycle.onFocus(() => { void useGamesRaw().fetchList(); });
     return () => sub.unsubscribe();
   }, [context]);
 
