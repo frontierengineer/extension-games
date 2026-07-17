@@ -66,7 +66,7 @@ export function register(hostProvider: HostProvider): void {
   const h = hostProvider.version(1);
   // The host bundle is a single daemon: all logic and capability live inside its
   // mount(), which receives the flat HostDaemonContext and returns the teardown.
-  h.daemon.register({ mount });
+  h.daemons.register({ id: 'games', mount });
 }
 
 // The games daemon. Drains the surface's store-queued commands (install a ROM,

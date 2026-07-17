@@ -4,11 +4,29 @@
   "description": "A retro console emulator (via EmulatorJS) that browses archive.org ROM catalogs and plays games in-browser, including your own ROMs.",
   "surface": {
     "allowEval": true,
-    "frameHosts": ["cdn.emulatorjs.org"]
+    "frameHosts": [
+      "cdn.emulatorjs.org"
+    ]
   },
   "realms": {
-    "surface": { "applications": ["games"], "sidebars": [], "daemon": true },
-    "host": { "mcpTools": ["install_game"], "voice": false },
+    "surface": {
+      "applications": [
+        "games"
+      ],
+      "sidebars": [],
+      "daemons": [
+        "games"
+      ]
+    },
+    "host": {
+      "mcpTools": [
+        "install_game"
+      ],
+      "voice": false,
+      "daemons": [
+        "games"
+      ]
+    },
     "worker": null
   }
 }

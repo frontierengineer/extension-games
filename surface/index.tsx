@@ -102,7 +102,8 @@ export function register(surfaceProvider: SurfaceProvider): void {
   // a BYO game from the daemon (no visible surface required), so the new game
   // shows in the rail once the Games app is shown; the in-app library's Add takes
   // the richer path (a navigate callback) so the fresh game opens in the main pane.
-  surface.daemon.register({
+  surface.daemons.register({
+    id: 'games',
     mount(ctx) {
       initGames(ctx.store);
       ctx.actions.register({
