@@ -1,5 +1,4 @@
 import { archiveMetadataUrl, type CatalogEntry } from '../consoles';
-import type { Http } from '../../types';
 
 // ── Legible network-failure helpers (shared with mcp/index.ts) ───────
 //
@@ -105,21 +104,23 @@ export function parseCatalog(files: ArchiveFile[]): CatalogEntry[] {
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 
-export async function fetchCatalogEntries(http: Http, item: string): Promise<CatalogEntry[]> {
+export async function fetchCatalogEntries(item: string): Promise<CatalogEntry[]> {
   const url = archiveMetadataUrl(item);
-  let res;
+  let res: Response;
+  let body: string;
   try {
-    res = await http.fetch(url, { method: null, headers: {}, body: null, timeoutMs: 45_000, responseType: null });
+    res = await fetch(url, { signal: AbortSignal.timeout(45_000) });
+    body = await res.text();
   } catch (err: any) {
-    // A THROWN error is our network/guard layer (timeout, SSRF/allowlist, DNS),
-    // not an archive.org status — name the host so the cause is unambiguous.
+    // A THROWN error is the network layer (timeout, DNS, TLS), not an
+    // archive.org status — name the host so the cause is unambiguous.
     throw new Error(`couldn't reach ${shortUrl(url)}: ${err?.message || String(err)}`);
   }
   if (res.status < 200 || res.status >= 300) {
     throw new Error(`archive.org metadata HTTP ${res.status} for item "${item}" — ${httpStatusHint(res.status)}`);
   }
   let data: { files?: ArchiveFile[] };
-  try { data = JSON.parse(res.body); } catch { throw new Error(`archive.org metadata for "${item}" was not valid JSON`); }
+  try { data = JSON.parse(body); } catch { throw new Error(`archive.org metadata for "${item}" was not valid JSON`); }
   const entries = parseCatalog(data.files || []);
   if (entries.length === 0) throw new Error(`no playable games found in archive item "${item}"`);
   return entries;

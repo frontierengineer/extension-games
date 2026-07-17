@@ -1,4 +1,4 @@
-import type { HostProvider, HostDaemonContext, Store, Http, ToolResult } from '../../types';
+import type { HostProvider, HostDaemonContext, Store, ToolResult } from '../../types';
 import {
   CONSOLES, consoleSpec, archiveDownloadUrl, type Catalog,
 } from '../consoles';
@@ -10,9 +10,9 @@ import { fetchCatalogEntries, httpStatusHint, shortUrl } from './catalog';
 
 // Host-side games capability. The browser surface/ can't fetch ROMs itself — the
 // archive.org file responses don't send CORS headers — so the surface drops a
-// command marker in the store and we do the fetch here (over context.http, which is
-// allowlisted to archive.org in extension.json and SSRF-guarded) and build the
-// catalog. This is the same store-as-channel pattern spaces uses.
+// command marker in the store and this host bundle fetches from archive.org
+// directly and builds the catalog. This is the same store-as-channel pattern
+// spaces uses.
 
 const CATALOG_TTL_MS = 30 * 24 * 60 * 60 * 1000; // rebuild a catalog monthly
 
@@ -36,31 +36,30 @@ async function readCatalog(store: Store, console: string): Promise<Catalog | nul
   return r.value;
 }
 
-async function downloadRom(http: Http, url: string): Promise<Uint8Array> {
-  let res;
+async function downloadRom(url: string): Promise<Uint8Array> {
+  let res: Response;
+  let bytes: Uint8Array;
   try {
-    res = await http.fetch(url, { method: null, headers: {}, body: null, timeoutMs: 120_000, responseType: 'bytes' });
+    res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+    if (res.status < 200 || res.status >= 300) {
+      // `res.url` is the FINAL hop after archive.org's 302 to a data node —
+      // name it (not the /download/ handle) so the failing host is the real one.
+      throw new Error(`archive.org returned HTTP ${res.status} for ${shortUrl(res.url || url)} — ${httpStatusHint(res.status)}`);
+    }
+    bytes = new Uint8Array(await res.arrayBuffer());
   } catch (err: any) {
-    // A THROWN error is our network/guard layer, NOT an archive.org status:
-    // a timeout, the 64MB response cap (large N64/GBA ROMs), the SSRF/allowlist
-    // guard, or DNS. Name the file + add a hint so our limit is distinguishable
-    // from an archive.org failure.
+    // A THROWN error from fetch itself is the network layer, NOT an
+    // archive.org status: a timeout, DNS, or TLS. Name the file + add a hint
+    // so a stall is distinguishable from an archive.org failure.
     const msg = err?.message || String(err);
-    let hint = '';
-    if (/byte cap/.test(msg)) hint = ' — this ROM is larger than the download size limit';
-    else if (/timed out/.test(msg)) hint = ' — the download timed out (a large ROM over a slow link may need a retry)';
-    else if (/allowed network hosts|internal\/non-routable/.test(msg)) hint = ' — the download host is blocked by this extension\'s network allowlist';
+    if (/archive\.org returned HTTP/.test(msg)) throw err;
+    const hint = /timeout|timed out|abort/i.test(msg)
+      ? ' — the download timed out (a large ROM over a slow link may need a retry)'
+      : '';
     throw new Error(`couldn't fetch ${shortUrl(url)}: ${msg}${hint}`);
   }
-  // `res.url` is the FINAL hop after archive.org's 302 to a data node — name it
-  // (not the /download/ handle) so the failing host is the real one.
-  const where = shortUrl(res.url || url);
-  if (res.status < 200 || res.status >= 300) {
-    throw new Error(`archive.org returned HTTP ${res.status} for ${where} — ${httpStatusHint(res.status)}`);
-  }
-  const buf = Buffer.from(res.body, 'base64');
-  if (buf.length === 0) throw new Error(`archive.org returned an empty file for ${where}`);
-  return new Uint8Array(buf);
+  if (bytes.length === 0) throw new Error(`archive.org returned an empty file for ${shortUrl(res.url || url)}`);
+  return bytes;
 }
 
 export function register(hostProvider: HostProvider): void {
@@ -75,7 +74,6 @@ export function register(hostProvider: HostProvider): void {
 // context handed at mount. Returns a dispose that drops the store watch at unload.
 function mount(context: HostDaemonContext): { dispose?: () => void } {
   const store: Store = context.store;
-  const http: Http = context.http;
 
   const installing = new Set<string>();
   const buildingCatalog = new Set<string>();
@@ -96,7 +94,7 @@ function mount(context: HostDaemonContext): { dispose?: () => void } {
       const romUrl = archiveDownloadUrl(spec.archiveItem, game.source.file);
       console.log(`[games] downloading ${gameId} from ${shortUrl(romUrl)}`);
       try {
-        const bytes = await downloadRom(http, romUrl);
+        const bytes = await downloadRom(romUrl);
         await store.putBytes({ key: romKey(gameId), value: Buffer.from(bytes) });
         await writeGame(store, { ...game, hasRom: true, fetch: { state: 'ready' } });
         console.log(`[games] installed ${gameId} (${bytes.length}B)`);
@@ -122,7 +120,7 @@ function mount(context: HostDaemonContext): { dispose?: () => void } {
     try {
       let catalog: Catalog;
       try {
-        const games = await fetchCatalogEntries(http, spec.archiveItem);
+        const games = await fetchCatalogEntries(spec.archiveItem);
         catalog = { builtAt: new Date().toISOString(), item: spec.archiveItem, games };
         console.log(`[games] built ${consoleId} catalog: ${games.length} games`);
       } catch (err: any) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ExtensionSidebar, Split } from '@frontierengineer/ui';
-import type { SurfaceProvider, SurfaceViewContext, SurfaceContext } from '../../types';
+import type { SurfaceProvider, SurfaceApplicationContext, SurfaceContext } from '../../types';
 import { GamesSidebar } from './components/GamesSidebar';
 import { GameView } from './components/GameView';
 import { GamesLibrary } from './components/GamesLibrary';
@@ -22,7 +22,7 @@ import './styles.css';
 // What the main pane shows: the catalog browser, or one saved game by id.
 type Selection = { kind: 'library' } | { kind: 'game'; id: string };
 
-function GamesApp({ context }: { context: SurfaceViewContext }) {
+function GamesApp({ context }: { context: SurfaceApplicationContext }) {
   const list = useGames((a) => a.list);
   const loaded = useGames((a) => a.loaded);
 
@@ -134,7 +134,7 @@ export function register(surfaceProvider: SurfaceProvider): void {
     icon: 'M5 6.5H3.5a2 2 0 0 0-2 2l-.4 3a1.6 1.6 0 0 0 3 .8L4.5 11h7l.4 1.3a1.6 1.6 0 0 0 3-.8l-.4-3a2 2 0 0 0-2-2zM3.5 8.5h2M4.5 7.5v2M10.5 8.5h.01M12 9.5h.01',
     color: '#ef4444',
     requires: null,
-    mount(context: SurfaceViewContext) {
+    mount(context: SurfaceApplicationContext) {
       initGames(context.store);
       root = createRoot(context.container);
       root.render(<GamesApp context={context} />);
